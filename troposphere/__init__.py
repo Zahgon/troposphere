@@ -69,11 +69,9 @@ PARAMETER_TITLE_MAX: Final[int] = 255
 valid_names = re.compile(r"^[a-zA-Z0-9]+$")
 
 
-
-
 @overload
 def encode_to_dict(
-    obj: Union[Dict[str, Any], JSONreprProtocol, ToDictProtocol]
+    obj: Union[Dict[str, Any], JSONreprProtocol, ToDictProtocol],
 ) -> Dict[str, Any]: ...
 
 
@@ -88,7 +86,7 @@ def encode_to_dict(obj: Optional[str]) -> Optional[str]: ...
 def encode_to_dict(
     obj: Union[
         Dict[str, Any], List[Any], JSONreprProtocol, ToDictProtocol, Tuple[Any], Any
-    ]
+    ],
 ) -> Union[Dict[str, Any], List[Any], Any]:
     if hasattr(obj, "to_dict"):
         # Calling encode_to_dict to ensure object is
@@ -118,7 +116,7 @@ def encode_to_dict(
 
 
 def depends_on_helper(
-    obj: Optional[Union[List[object], object]]
+    obj: Optional[Union[List[object], object]],
 ) -> Union[Optional[str], List[Optional[str]], List[Any], Any]:
     """Handles using .title if the given object is a troposphere resource.
 
@@ -198,7 +196,6 @@ class BaseAWSObject:
             self.__setattr__(k, v)
 
         self.add_to_template()
-
 
     def __getattr__(self, name: str) -> Any:
         # If pickle loads this object, then __getattr__ will cause
@@ -312,10 +309,8 @@ class BaseAWSObject:
             % (self.__class__, self.title, name, type(value), expected_type)
         )
 
-
     def validate(self) -> None:
         pass
-
 
     def to_dict(self, validation: bool = True) -> Dict[str, Any]:
         if validation and self.do_validation:
@@ -340,8 +335,6 @@ class BaseAWSObject:
         return json.dumps(
             self.to_dict(validation=validation), indent=indent, sort_keys=sort_keys
         )
-
-
 
     def _validate_props(self) -> None:
         for k, (_, required) in self.props.items():
@@ -372,9 +365,13 @@ class BaseAWSObject:
 class AWSObject(BaseAWSObject):
     dictname = "Properties"
 
+    def ref(self) -> Ref:
+        return Ref(self)
 
     Ref = ref
 
+    def get_att(self, value: str) -> GetAtt:
+        return GetAtt(self, value)
 
     GetAtt = get_att
 
@@ -389,6 +386,8 @@ class AWSDeclaration(BaseAWSObject):
     def __init__(self, title: str, **kwargs: Any) -> None:
         super().__init__(title, **kwargs)
 
+    def ref(self) -> Ref:
+        return Ref(self)
 
     Ref = ref
 
@@ -419,8 +418,6 @@ class AWSAttribute(BaseAWSObject):
         super().__init__(title, **kwargs)
 
 
-
-
 def validate_pausetime(pausetime: str) -> str:
     if not pausetime.startswith("PT"):
         raise ValueError("PauseTime should look like PT#H#M#S")
@@ -429,7 +426,6 @@ def validate_pausetime(pausetime: str) -> str:
 
 class AWSHelperFn:
     data: Any
-
 
     def to_dict(self) -> Any:
         return encode_to_dict(self.data)  # type: ignore
@@ -642,7 +638,6 @@ class Tags(AWSHelperFn):
                         "Tags needs to be either kwargs, dict, or AWSHelperFn"
                     )
 
-
         # Detect and handle non-string Tag items which do not sort in Python3
         if all(isinstance(k, str) for k in tag_dict):
             for k, v in sorted(tag_dict.items()):
@@ -658,7 +653,6 @@ class Tags(AWSHelperFn):
 
     def to_dict(self) -> List[Any]:
         return [encode_to_dict(tag) for tag in self.tags]
-
 
 
 __OutputTypeVar = TypeVar("__OutputTypeVar", "Output", List["Output"])
@@ -715,17 +709,8 @@ class Template:
         self.version = None
         self.transform = None
 
-
-
-
     def handle_duplicate_key(self, key: Optional[str]) -> NoReturn:
         raise ValueError('duplicate key "%s" detected' % key)
-
-
-
-
-
-
 
     def add_rule(self, name: str, rule: object) -> None:
         """
@@ -738,9 +723,6 @@ class Template:
                      (optional) keys
         """
         pass
-
-
-
 
     def to_dict(self) -> Dict[str, Any]:
         t: dict[str, Any] = {}
@@ -796,7 +778,6 @@ class Template:
             self.to_dict(), indent=indent, sort_keys=sort_keys, separators=separators
         )
 
-
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Template):
             return self.to_json() == other.to_json()
@@ -825,7 +806,6 @@ class Output(AWSDeclaration):
     }
 
 
-
 class Parameter(AWSDeclaration):
     STRING_PROPERTIES = ["AllowedPattern", "MaxLength", "MinLength"]
     NUMBER_PROPERTIES = ["MaxValue", "MinValue"]
@@ -844,8 +824,6 @@ class Parameter(AWSDeclaration):
         "ConstraintDescription": (str, False),
     }
     title: str | None
-
-
 
     def validate(self) -> None:
         def check_type(t: type, v: Any) -> bool:
@@ -891,13 +869,13 @@ class Parameter(AWSDeclaration):
             for p in not_allowed:
                 if p in self.properties:
                     raise ValueError(
-                        "%s can only be used with parameters of " "the String type." % p
+                        "%s can only be used with parameters of the String type." % p
                     )
         if self.properties["Type"] == "Number":
             for p in list(set(self.STRING_PROPERTIES + self.COMMA_DELIMITED_LIST)):
                 if p in self.properties:
                     raise ValueError(
-                        "%s can only be used with parameters of " "the Number type." % p
+                        "%s can only be used with parameters of the Number type." % p
                     )
         if self.properties["Type"] == "CommaDelimitedList":
             not_allowed = [

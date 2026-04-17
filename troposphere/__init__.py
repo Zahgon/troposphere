@@ -69,14 +69,6 @@ PARAMETER_TITLE_MAX: Final[int] = 255
 valid_names = re.compile(r"^[a-zA-Z0-9]+$")
 
 
-def is_aws_object_subclass(cls: Any) -> bool:
-    is_aws_object = False
-    try:
-        is_aws_object = issubclass(cls, BaseAWSObject)
-    # prop_type isn't a class
-    except TypeError:
-        pass
-    return is_aws_object
 
 
 @overload
@@ -207,10 +199,6 @@ class BaseAWSObject:
 
         self.add_to_template()
 
-    def add_to_template(self) -> None:
-        # Bound it to template if we know it
-        if self.template is not None:
-            self.template.add_resource(self)
 
     def __getattr__(self, name: str) -> Any:
         # If pickle loads this object, then __getattr__ will cause
@@ -324,16 +312,10 @@ class BaseAWSObject:
             % (self.__class__, self.title, name, type(value), expected_type)
         )
 
-    def validate_title(self) -> None:
-        if not self.title or not valid_names.match(self.title):
-            raise ValueError('Name "%s" not alphanumeric' % self.title)
 
     def validate(self) -> None:
         pass
 
-    def no_validation(self: __BaseAWSObjectTypeVar) -> __BaseAWSObjectTypeVar:
-        self.do_validation = False
-        return self
 
     def to_dict(self, validation: bool = True) -> Dict[str, Any]:
         if validation and self.do_validation:
@@ -359,55 +341,7 @@ class BaseAWSObject:
             self.to_dict(validation=validation), indent=indent, sort_keys=sort_keys
         )
 
-    @classmethod
-    def _from_dict(
-        cls: Type[__BaseAWSObjectTypeVar], title: Optional[str] = None, **kwargs: Any
-    ) -> __BaseAWSObjectTypeVar:
-        props: Dict[str, Any] = {}
-        for prop_name, value in kwargs.items():
-            try:
-                prop_attrs = cls.props[prop_name]
-            except KeyError:
-                raise AttributeError(
-                    "Object type %s does not have a "
-                    "%s property." % (cls.__name__, prop_name)
-                )
-            prop_type = prop_attrs[0]
-            value = kwargs[prop_name]
-            is_aws_object = is_aws_object_subclass(prop_type)
-            if is_aws_object:
-                if not isinstance(value, collections.abc.Mapping):
-                    raise ValueError(
-                        "Property definition for %s must be "
-                        "a Mapping type" % prop_name
-                    )
-                value = cast(BaseAWSObject, prop_type)._from_dict(None, **value)
 
-            if isinstance(prop_type, list):
-                if not isinstance(value, list):
-                    raise TypeError("Attribute %s must be a " "list." % prop_name)
-                new_value: List[Any] = []
-                for v in cast(List[Any], value):
-                    new_v = v
-                    if is_aws_object_subclass(prop_type[0]):
-                        if not isinstance(v, collections.abc.Mapping):
-                            raise ValueError(
-                                "Property definition for %s must be "
-                                "a list of Mapping types" % prop_name
-                            )
-                        new_v = cast(BaseAWSObject, prop_type[0])._from_dict(None, **v)
-                    new_value.append(new_v)
-                value = new_value
-            props[prop_name] = value
-        if title:
-            return cls(title, **props)
-        return cls(**props)
-
-    @classmethod
-    def from_dict(
-        cls: Type[__BaseAWSObjectTypeVar], title: str, d: Dict[str, Any]
-    ) -> __BaseAWSObjectTypeVar:
-        return cls._from_dict(title, **d)
 
     def _validate_props(self) -> None:
         for k, (_, required) in self.props.items():
@@ -438,13 +372,9 @@ class BaseAWSObject:
 class AWSObject(BaseAWSObject):
     dictname = "Properties"
 
-    def ref(self) -> Ref:
-        return Ref(self)
 
     Ref = ref
 
-    def get_att(self, value: str) -> GetAtt:
-        return GetAtt(self, value)
 
     GetAtt = get_att
 
@@ -459,8 +389,6 @@ class AWSDeclaration(BaseAWSObject):
     def __init__(self, title: str, **kwargs: Any) -> None:
         super().__init__(title, **kwargs)
 
-    def ref(self) -> Ref:
-        return Ref(self)
 
     Ref = ref
 
@@ -491,9 +419,6 @@ class AWSAttribute(BaseAWSObject):
         super().__init__(title, **kwargs)
 
 
-def validate_delimiter(delimiter: object) -> None:
-    if not isinstance(delimiter, str):
-        raise ValueError("Delimiter must be a String, %s provided" % type(delimiter))
 
 
 def validate_pausetime(pausetime: str) -> str:
@@ -505,11 +430,6 @@ def validate_pausetime(pausetime: str) -> str:
 class AWSHelperFn:
     data: Any
 
-    def getdata(self, data: object) -> Any:
-        if isinstance(data, BaseAWSObject):
-            return data.title
-        else:
-            return data
 
     def to_dict(self) -> Any:
         return encode_to_dict(self.data)  # type: ignore
@@ -722,15 +642,6 @@ class Tags(AWSHelperFn):
                         "Tags needs to be either kwargs, dict, or AWSHelperFn"
                     )
 
-        def add_tag(
-            tag_list: List[Union[AWSHelperFn, Dict[Any, Any]]], k: object, v: object
-        ):
-            tag_list.append(
-                {
-                    "Key": k,
-                    "Value": v,
-                }
-            )
 
         # Detect and handle non-string Tag items which do not sort in Python3
         if all(isinstance(k, str) for k in tag_dict):
@@ -748,9 +659,6 @@ class Tags(AWSHelperFn):
     def to_dict(self) -> List[Any]:
         return [encode_to_dict(tag) for tag in self.tags]
 
-    @classmethod
-    def from_dict(cls, title: Optional[str] = None, **kwargs: Any):
-        return cls(**kwargs)
 
 
 __OutputTypeVar = TypeVar("__OutputTypeVar", "Output", List["Output"])
@@ -807,59 +715,17 @@ class Template:
         self.version = None
         self.transform = None
 
-    def set_description(self, description: str) -> None:
-        self.description = description
 
-    def set_metadata(self, metadata: Dict[str, Any]) -> None:
-        self.metadata = metadata
 
-    def add_condition(self, name: str, condition: AWSHelperFn) -> str:
-        self.conditions[name] = condition
-        return name
 
     def handle_duplicate_key(self, key: Optional[str]) -> NoReturn:
         raise ValueError('duplicate key "%s" detected' % key)
 
-    def _update(self, d: Dict[Any, Any], values: __UpdateTypeVar) -> __UpdateTypeVar:
-        if isinstance(values, list):
-            for v in values:
-                if v.title in d:
-                    self.handle_duplicate_key(v.title)
-                d[v.title] = v
-        else:
-            if values.title in d:
-                self.handle_duplicate_key(values.title)
-            d[values.title] = values
-        return values
 
-    def add_output(self, output: __OutputTypeVar) -> __OutputTypeVar:
-        if len(self.outputs) >= MAX_OUTPUTS:
-            raise ValueError("Maximum outputs %d reached" % MAX_OUTPUTS)
-        return self._update(self.outputs, output)
 
-    def add_mapping(self, name: str, mapping: Dict[str, Any]) -> None:
-        if len(self.mappings) >= MAX_MAPPINGS:
-            raise ValueError("Maximum mappings %d reached" % MAX_MAPPINGS)
-        if name not in self.mappings:
-            self.mappings[name] = {}
-        self.mappings[name].update(mapping)
 
-    def add_parameter(self, parameter: __ParameterTypeVar) -> __ParameterTypeVar:
-        if len(self.parameters) >= MAX_PARAMETERS:
-            raise ValueError("Maximum parameters %d reached" % MAX_PARAMETERS)
-        return self._update(self.parameters, parameter)
 
-    def get_or_add_parameter(self, parameter: Parameter) -> Parameter:
-        if parameter.title in self.parameters:
-            return self.parameters[parameter.title]
-        else:
-            self.add_parameter(parameter)
-        return parameter
 
-    def add_resource(self, resource: __ResourceTypeVar) -> __ResourceTypeVar:
-        if len(self.resources) >= MAX_RESOURCES:
-            raise ValueError("Maximum number of resources %d reached" % MAX_RESOURCES)
-        return self._update(self.resources, resource)
 
     def add_rule(self, name: str, rule: object) -> None:
         """
@@ -871,34 +737,10 @@ class Template:
         :param rule: a dict with 'Assertions' (mandatory) and 'RuleCondition'
                      (optional) keys
         """
-        # TODO: check maximum number of Rules, and enforce limit.
-        if name in self.rules:
-            self.handle_duplicate_key(name)
-        self.rules[name] = rule
+        pass
 
-    def set_version(self, version: Optional[str] = None) -> None:
-        if version:
-            self.version = version
-        else:
-            self.version = "2010-09-09"
 
-    def set_transform(self, transform: Union[List[object], str]) -> None:
-        from troposphere.serverless import SERVERLESS_TRANSFORM
 
-        if self.globals and transform != SERVERLESS_TRANSFORM:
-            raise ValueError(
-                "Cannot set transform to non-Serverless while using Globals"
-            )
-        self.transform = transform
-
-    def set_globals(self, globals: Globals) -> None:
-        from troposphere.serverless import SERVERLESS_TRANSFORM
-
-        if self.transform != SERVERLESS_TRANSFORM:
-            raise ValueError(
-                f"Cannot set Globals for non-Serverless template (set transform to '{SERVERLESS_TRANSFORM}' first)"
-            )
-        self.globals = globals
 
     def to_dict(self) -> Dict[str, Any]:
         t: dict[str, Any] = {}
@@ -932,14 +774,7 @@ class Template:
         :type parameter: str or Parameter
         :type label: str
         """
-        labels = self.metadata.setdefault(
-            "AWS::CloudFormation::Interface", {}
-        ).setdefault("ParameterLabels", {})
-
-        if isinstance(parameter, BaseAWSObject):
-            labels[parameter.title] = {"default": label}
-        else:
-            labels[parameter] = {"default": label}
+        pass
 
     def add_parameter_to_group(
         self, parameter: Union[Parameter, str], group_name: str
@@ -949,30 +784,7 @@ class Template:
         :type parameter: str or Parameter
         :type group_name: str
         """
-        groups = self.metadata.setdefault(
-            "AWS::CloudFormation::Interface", {}
-        ).setdefault("ParameterGroups", [])
-
-        # Check if group_name already exists
-        existing_group: Optional[Dict[str, Any]] = None
-        for group in groups:
-            if group["Label"]["default"] == group_name:
-                existing_group = group
-                break
-
-        if existing_group is None:
-            existing_group = {
-                "Label": {"default": group_name},
-                "Parameters": [],
-            }
-            groups.append(existing_group)
-
-        if isinstance(parameter, BaseAWSObject):
-            existing_group["Parameters"].append(parameter.title)
-        else:
-            existing_group["Parameters"].append(parameter)
-
-        return group_name
+        pass
 
     def to_json(
         self,
@@ -984,12 +796,6 @@ class Template:
             self.to_dict(), indent=indent, sort_keys=sort_keys, separators=separators
         )
 
-    def to_yaml(
-        self, clean_up: bool = False, long_form: bool = False, sort_keys: bool = True
-    ) -> str:
-        return cfn_flip.to_yaml(  # type: ignore
-            self.to_json(sort_keys=sort_keys), clean_up=clean_up, long_form=long_form
-        )
 
     def __eq__(self, other: object) -> bool:
         if isinstance(other, Template):
@@ -1018,10 +824,6 @@ class Output(AWSDeclaration):
         "Value": (str, True),
     }
 
-    def add_to_template(self) -> None:
-        # Bound it to template if we know it
-        if self.template is not None:
-            self.template.add_output(self)
 
 
 class Parameter(AWSDeclaration):
@@ -1043,19 +845,7 @@ class Parameter(AWSDeclaration):
     }
     title: str | None
 
-    def add_to_template(self) -> None:
-        # Bound it to template if we know it
-        if self.template is not None:
-            self.template.add_parameter(self)
 
-    def validate_title(self) -> None:
-        self.title = cast(str, self.title)
-        if len(self.title) > PARAMETER_TITLE_MAX:
-            raise ValueError(
-                "Parameter title can be no longer than "
-                "%d characters" % PARAMETER_TITLE_MAX
-            )
-        super().validate_title()
 
     def validate(self) -> None:
         def check_type(t: type, v: Any) -> bool:

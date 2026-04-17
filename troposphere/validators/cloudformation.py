@@ -162,11 +162,6 @@ class InitConfig(AWSProperty):
     }
 
 
-def validate_authentication_type(auth_type):
-    valid_types = ["S3", "basic"]
-    if auth_type not in valid_types:
-        raise ValueError("Type needs to be one of %r" % valid_types)
-    return auth_type
 
 
 class AuthenticationBlock(AWSProperty):

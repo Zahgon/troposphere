@@ -60,19 +60,7 @@ def validate_action_on_failure(action_on_failure):
     """
     Validate action on failure for EMR StepConfig
     """
-
-    ACTIONS_ON_FAILURE = (
-        "TERMINATE_CLUSTER",
-        "CANCEL_AND_WAIT",
-        "CONTINUE",
-        "TERMINATE_JOB_FLOW",
-    )
-    if action_on_failure not in ACTIONS_ON_FAILURE:
-        raise ValueError(
-            "StepConfig ActionOnFailure  must be one of: %s"
-            % ", ".join(ACTIONS_ON_FAILURE)
-        )
-    return action_on_failure
+    pass
 
 
 def additional_info_validator(xs):

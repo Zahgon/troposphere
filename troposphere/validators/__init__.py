@@ -62,13 +62,6 @@ def positive_integer(x: Any) -> Union[str, bytes, SupportsInt, SupportsIndex]:
 def integer_range(
     minimum_val: float, maximum_val: float
 ) -> Callable[[Any], Union[str, bytes, SupportsInt, SupportsIndex]]:
-    def integer_range_checker(x: Any) -> Union[str, bytes, SupportsInt, SupportsIndex]:
-        i = int(x)
-        if i < minimum_val or i > maximum_val:
-            raise ValueError(
-                "Integer must be between %d and %d" % (minimum_val, maximum_val)
-            )
-        return x
 
     return integer_range_checker
 
@@ -76,16 +69,6 @@ def integer_range(
 def integer_list_item(
     allowed_values: List[int],
 ) -> Callable[[Any], Union[str, bytes, SupportsInt, SupportsIndex]]:
-    def integer_list_item_checker(
-        x: Any,
-    ) -> Union[str, bytes, SupportsInt, SupportsIndex]:
-        i = int(x)
-        if i in allowed_values:
-            return x
-        raise ValueError(
-            "Integer must be one of following: %s"
-            % ", ".join(str(j) for j in allowed_values)
-        )
 
     return integer_list_item_checker
 
@@ -111,7 +94,7 @@ def tags_or_list(x: Any) -> Union[AWSHelperFn, Tags, List[Any]]:
 
 def ignore(x: __T) -> __T:
     """Method to indicate bypassing property validation"""
-    return x
+    pass
 
 
 def defer(x: __T) -> __T:

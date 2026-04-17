@@ -54,6 +54,11 @@ assert types  # silence pyflakes
 SERVERLESS_TRANSFORM = "AWS::Serverless-2016-10-31"
 
 
+def primary_key_type_validator(x):
+    valid_types = ["String", "Number", "Binary"]
+    if x not in valid_types:
+        raise ValueError("KeyType must be one of: %s" % ", ".join(valid_types))
+    return x
 
 
 class DeadLetterQueue(AWSProperty):
@@ -137,6 +142,15 @@ class EventInvokeConfiguration(AWSProperty):
     }
 
 
+def validate_authtype(authtype):
+    VALID_AUTHTYPE = [
+        "AWS_IAM",
+        "NONE",
+    ]
+
+    if authtype not in VALID_AUTHTYPE:
+        raise ValueError("AuthType must be one of: %s" % ", ".join(VALID_AUTHTYPE))
+    return authtype
 
 
 class FunctionUrlConfig(AWSProperty):
@@ -536,6 +550,11 @@ class SNSEvent(AWSObject):
     }
 
 
+def starting_position_validator(x):
+    valid_types = ["TRIM_HORIZON", "LATEST"]
+    if x not in valid_types:
+        raise ValueError("StartingPosition must be one of: %s" % ", ".join(valid_types))
+    return x
 
 
 class KinesisEvent(AWSObject):
@@ -585,6 +604,21 @@ class RequestModel(AWSProperty):
     }
 
 
+def api_function_auth_validator(auth):
+    if not isinstance(auth, (Auth, ApiFunctionAuth)):
+        raise TypeError(
+            f"Value {auth} of type {type(auth)}, expected {Auth} or {ApiFunctionAuth}"
+        )
+
+    if isinstance(auth, Auth):
+        from warnings import warn
+
+        warn(
+            f"The use of {Auth} in ApiEvent is deprecated. Please use {ApiFunctionAuth} instead",
+            DeprecationWarning,
+        )
+
+    return auth
 
 
 class ApiEvent(AWSObject):

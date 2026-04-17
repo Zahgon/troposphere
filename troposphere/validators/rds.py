@@ -67,7 +67,14 @@ def validate_storage_type(storage_type):
     Validate StorageType for DBInstance
     Property:
     """
-    pass
+
+    VALID_STORAGE_TYPES = ("standard", "gp2", "gp3", "io1")
+
+    if storage_type not in VALID_STORAGE_TYPES:
+        raise ValueError(
+            "DBInstance StorageType must be one of: %s" % ", ".join(VALID_STORAGE_TYPES)
+        )
+    return storage_type
 
 
 def validate_engine(engine):
@@ -185,7 +192,42 @@ def validate_maintenance_window(window):
     """
     Validate PreferredMaintenanceWindow for DBInstance
     """
-    pass
+
+    days = ("Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun")
+    day_re = r"[A-Z]{1}[a-z]{2}"
+    hour = r"[01]?[0-9]|2[0-3]"
+    minute = r"[0-5][0-9]"
+    r = (
+        "(?P<start_day>%s):(?P<start_hour>%s):(?P<start_minute>%s)-"
+        "(?P<end_day>%s):(?P<end_hour>%s):(?P<end_minute>%s)"
+    ) % (day_re, hour, minute, day_re, hour, minute)
+    range_regex = re.compile(r)
+    m = range_regex.match(window)
+    if not m:
+        raise ValueError(
+            "DBInstance PreferredMaintenanceWindow must be in "
+            "the format: ddd:hh24:mi-ddd:hh24:mi"
+        )
+    if m.group("start_day") not in days or m.group("end_day") not in days:
+        raise ValueError(
+            "DBInstance PreferredMaintenanceWindow day part of "
+            "ranges must be one of: %s" % ", ".join(days)
+        )
+    start_ts = (
+        (days.index(m.group("start_day")) * 24 * 60)
+        + (int(m.group("start_hour")) * 60)
+        + int(m.group("start_minute"))
+    )
+    end_ts = (
+        (days.index(m.group("end_day")) * 24 * 60)
+        + (int(m.group("end_hour")) * 60)
+        + int(m.group("end_minute"))
+    )
+    if abs(end_ts - start_ts) < 30:
+        raise ValueError(
+            "DBInstance PreferredMaintenanceWindow must be at " "least 30 minutes long."
+        )
+    return window
 
 
 def validate_backup_retention_period(days):

@@ -427,6 +427,12 @@ def validate_pausetime(pausetime: str) -> str:
 class AWSHelperFn:
     data: Any
 
+    def getdata(self, data: object) -> Any:
+        if isinstance(data, BaseAWSObject):
+            return data.title
+        else:
+            return data
+
     def to_dict(self) -> Any:
         return encode_to_dict(self.data)  # type: ignore
 
